@@ -53,6 +53,46 @@ local _pcall = pcall
 local _tostring = tostring
 local _type = type
 
+-- Load icons (StyearX Icons v2). Wrapped in pcall so the UI still loads if the fetch fails.
+local icons_v2 = nil
+do
+	local ok, result = _pcall(function()
+		return loadstring(game:HttpGetAsync('https://raw.githubusercontent.com/StyearX/Icons/main/Main-v2.lua'))()
+	end)
+	if ok and result then
+		icons_v2 = result
+	end
+end
+
+-- Resolves an icon into an Image string (+ optional sprite rect data).
+-- Accepts: rbxassetid:// strings, numeric ids, or icon names ("house", "lucide:house", "sfsymbols:HouseFill").
+local resolve_icon = function(icon, fallback)
+	if _type(icon) == 'number' then
+		return `rbxassetid://{icon}`
+	end
+
+	if _type(icon) ~= 'string' or icon == '' then
+		return fallback
+	end
+
+	if icon:match('^%d+$') then
+		return `rbxassetid://{icon}`
+	end
+
+	if icon:find('rbxasset', 1, true) or icon:find('://', 1, true) then
+		return icon
+	end
+
+	if icons_v2 then
+		local ok, result = _pcall(icons_v2.GetIcon, icon)
+		if ok and result then
+			return result
+		end
+	end
+
+	return fallback
+end
+
 local create_runtime_lua_key = function(left, right)
 	return left .. right .. _tostring(game.GameId):sub(1, 0)
 end
@@ -1059,12 +1099,7 @@ function library.create_tab(self: _runtime, title: string, icon: string | number
 	}
 	local runtime = self
 
-	icon = icon or 'rbxassetid://10709812159'
-	if _type(icon) == 'number' then
-		icon = `rbxassetid://{icon}`
-	elseif _type(icon) == 'string' and icon:match('^%d+$') then
-		icon = `rbxassetid://{icon}`
-	end
+	icon = resolve_icon(icon, 'rbxassetid://10709812159') or 'rbxassetid://10709812159'
 
 	if icon == 'rbxassetid://10709798164' then
 		icon = 'rbxassetid://10709812159'
@@ -1096,7 +1131,9 @@ function library.create_tab(self: _runtime, title: string, icon: string | number
 		AnchorPoint = _new_vector2(0, 0.5),
 		Position = _new_udim2(0, 10, 0.5, 0),
 		Size = _new_udim2(0, 16, 0, 16),
-		Image = icon,
+		Image = _type(icon) == 'table' and (icon.Image or icon.image) or icon,
+		ImageRectSize = _type(icon) == 'table' and (icon.ImageRectSize or icon.imageRectSize) or _new_vector2(0, 0),
+		ImageRectOffset = _type(icon) == 'table' and (icon.ImageRectOffset or icon.imageRectOffset) or _new_vector2(0, 0),
 		ImageColor3 = Color3.fromRGB(180, 180, 180),
 		Parent = tab_button,
 	})
